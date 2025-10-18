@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Noto+Sans+SC:wght@300;400&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000011;
+            font-family: 'Noto Sans SC', sans-serif; /* Set a more comfortable default font */
+            cursor: none; /* Hide default cursor */
+        }
+        canvas {
+            display: block;
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: -1;
+        }
+        .content {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start; /* Aligns content to the top */
+            align-items: center;
+            height: 100vh;
+            color: white;
+            text-align: center;
+            padding: 15vh 20px 20px 20px; /* Pushed down from the top for better viewing */
+            pointer-events: none; /* Allow mouse events to pass through to canvas */
+        }
+        .content > * {
+            pointer-events: all; /* Re-enable pointer events for controls */
+        }
+        
+        .instructions {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 0.8rem;
+            transition: opacity 1s ease-out 3s;
+            opacity: 1;
+            z-index: 100;
+        }
+        .instructions.fade-out {
+            opacity: 0;
+        }
+
+        @keyframes shimmer {
+            0%, 100% {
+                text-shadow: 0 0 15px rgba(255, 255, 255, 0.6);
+                opacity: 1;
+            }
+            50% {
+                text-shadow: 0 0 25px rgba(220, 220, 255, 0.9);
+                opacity: 0.85;
+            }
+        }
+
+        .shimmer-text {
+            animation: shimmer 3s infinite ease-in-out;
+        }
+
+        .divider {
+            width: 60vw; /* Greatly increased width to separate screen areas */
+            max-width: 800px; /* Added a max-width for very wide screens */
+            height: 1px;
+            margin-top: 2.5rem; /* Adjusted for better balance */
+            background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.6), transparent);
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
+        }
+
+        .button-container {
+            margin-top: 3rem; /* Spacing below the divider */
+            display: flex;
+            flex-wrap: wrap; /* Allow buttons to wrap on smaller screens */
+            justify-content: center;
+            gap: 2.5rem; /* Increased space between buttons for better aesthetics */
+        }
+
+        .Bo-button {
+            background-color: rgba(20, 20, 40, 0.3); /* Deep blue, semi-transparent */
+            border: 1px solid rgba(120, 120, 255, 0.3); /* Faint purple border */
+            border-radius: 8px;
+            padding: 0.75rem 1.5rem;
+            color: rgba(255, 255, 255, 0.8);
+            font-family: 'Noto Sans SC', sans-serif;
+            font-weight: 300;
+            text-shadow: 0 0 5px rgba(255, 255, 255, 0.2);
+            box-shadow: 0 0 15px rgba(120, 120, 255, 0.1), inset 0 0 10px rgba(120, 120, 255, 0.1); /* Subtle outer and inner glow */
+            transition: all 0.3s ease;
+            cursor: pointer; /* To make it feel like a button */
+            text-decoration: none; /* If using <a> tags */
+        }
+
+        .Bo-button:hover {
+            background-color: rgba(40, 40, 80, 0.5);
+            border-color: rgba(180, 180, 255, 0.7);
+            color: #fff;
+            box-shadow: 0 0 25px rgba(180, 180, 255, 0.5), inset 0 0 15px rgba(180, 180, 255, 0.2);
+            transform: translateY(-2px); /* Slight lift effect */
+        }
+
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease;
+            pointer-events: all; /* Enable pointer events for the modal */
+            overflow-y: auto; /* Allow scrolling for large modals */
+            padding: 2rem 0;
+        }
+
+        .modal-overlay.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal-content {
+            background-color: rgba(20, 20, 40, 0.6);
+            border: 1px solid rgba(120, 120, 255, 0.3);
+            border-radius: 12px;
+            padding: 2rem;
+            width: 90%;
+            max-width: 400px;
+            color: rgba(255, 255, 255, 0.9);
+            box-shadow: 0 0 30px rgba(120, 120, 255, 0.3);
+            position: relative;
+            transform: scale(0.95);
+            transition: transform 0.3s ease;
+            cursor: default;
+        }
+
+        .modal-overlay.visible .modal-content {
+            transform: scale(1);
+        }
+
+        .modal-close-btn {
+            position: absolute;
+            top: 0.75rem;
+            right: 0.75rem;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: rgba(255, 255, 255, 0.5);
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+
+        .modal-close-btn:hover {
+            color: #fff;
+        }
+
+        /* Pricing Modal Specific Styles */
+        #pricingModal .modal-content {
+            max-width: 900px; /* Wider modal for pricing table */
+            background: rgba(10, 10, 25, 0.7);
+        }
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1.5rem;
+        }
+        .pricing-card {
+            background-color: rgba(20, 20, 40, 0.5);
+            border: 1px solid rgba(120, 120, 255, 0.2);
+            border-radius: 12px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .pricing-card.highlight, .pricing-card:hover {
+            border-color: #818cf8;
+            box-shadow: 0 0 20px rgba(129, 140, 248, 0.4);
+            transform: scale(1.05);
+        }
+        .pricing-card ul {
+            list-style: none;
+            padding: 0;
+            margin: 1.5rem 0;
+            flex-grow: 1;
+        }
+        .pricing-card li {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.8);
+        }
+        .pricing-card .price {
+            font-size: 2.5rem;
+            font-weight: bold;
+        }
+        .pricing-card .price-sub {
+            font-size: 1rem;
+            color: rgba(255, 255, 255, 0.6);
+        }
+        .pricing-cta {
+            background-color: #312e81;
+            color: white;
+            padding: 0.75rem;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: bold;
+            transition: background-color 0.3s ease;
+            text-decoration: none;
+        }
+        .pricing-cta:hover {
+            background-color: #4338ca;
+        }
+        .pricing-card.highlight .pricing-cta {
+            background-color: #6366f1;
+        }
+        .pricing-card.highlight .pricing-cta:hover {
+            background-color: #818cf8;
+        }
+
+
+        /* Progress Bar Styles */
+        .progress-bar-container {
+            width: 100%;
+            height: 8px;
+            background-color: rgba(0, 0, 0, 0.3);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 1rem;
+        }
+        .progress-bar {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, rgba(120, 120, 255, 0.6), rgba(180, 180, 255, 1));
+            transition: width 5s cubic-bezier(0.25, 1, 0.5, 1); /* Slower animation */
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="starfield"></canvas>
+    
+    <div class="instructions" id="instructions">
+        按住鼠标 - 曲速航行 | 按住 Shift - 引力模式
+    </div>
+
+    <div class="content">
+        <h1 class="text-4xl md:text-6xl font-bold text-gray-100" style="font-family: 'Playfair Display', serif; text-shadow: 0 0 20px rgba(255,255,255,0.7);">
+            Bo
+        </h1> 
+        <p class="text-xl md:text-2xl text-gray-200 shimmer-text mt-2" style="font-family: 'Noto Sans SC', sans-serif; font-weight: 300; letter-spacing: 0.2em;">
+            臻于极致，卓越非凡
+        </p>
+        <div class="divider"></div>
+
+        <div class="button-container">
+            <a href="http://39.105.23.141/Bo2.0.exe"download="Bo2.0.exe" id="downloadBtn" class="Bo-button">获取文件</a>
+            <a href="https://lik-love.xyz" target="_blank" rel="noopener noreferrer" class="Bo-button">卡网</a>
+            <a href="https://flowus.cn/xb-bo/share/2630b882-7942-4b36-afaf-9817d2d0e0f6?code=5MAN0S"  target="_blank" rel="noopener noreferrer" class="Bo-button">教程</a>
+            <a href="#" id="qqGroupBtn" class="Bo-button">获取官方Q群</a>
+            <a href="#" id="pricingBtn" class="Bo-button">查看定价</a>
+        </div>
+        
+    </div>
+
+    <!-- QQ Group Modal Structure -->
+    <div id="qqModal" class="modal-overlay">
+        <div class="modal-content">
+            <button id="closeQQModalBtn" class="modal-close-btn">&times;</button>
+            <h2 class="text-2xl font-bold mb-4" style="color: #c7d2fe;">加入官方社群</h2>
+            <div class="text-left text-lg space-y-2">
+                <p>一群：1039645468</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Download Progress Modal Structure -->
+    <div id="downloadModal" class="modal-overlay">
+        <div class="modal-content">
+            <h2 class="text-2xl font-bold mb-2" style="color: #c7d2fe;">正在准备下载...</h2>
+            <p class="text-sm text-gray-400 mb-4">下载已开始，请留意您的浏览器下载栏。</p>
+            <div class="progress-bar-container">
+                <div id="progressBar" class="progress-bar"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pricing Modal Structure -->
+    <div id="pricingModal" class="modal-overlay">
+        <div class="modal-content">
+            <button id="closePricingModalBtn" class="modal-close-btn">&times;</button>
+            <div class="pricing-grid">
+                <!-- Basic Plan -->
+                <div class="pricing-card">
+                    <h3 class="text-xl font-bold">Basic</h3>
+                    <p class="price mt-4">¥6 <span class="price-sub">/ 天</span></p>
+                    <ul>
+                        <li><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>ai（锁球、合球、追踪炮、追踪三角）</li>
+                        <li><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>官方群聊</li>
+                        <li><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>官方Bo</li>
+                    </ul>
+                    <a href="https://lik-love.xyz/#/goods?goods_id=2" target="_blank" rel="noopener noreferrer" class="pricing-cta mt-auto">升级到 Basic</a>
+                </div>
+                <!-- Plus Plan (Highlight) -->
+                <div class="pricing-card highlight">
+                    <h3 class="text-xl font-bold">Plus</h3>
+                    <p class="price mt-4">¥33 <span class="price-sub">/ 周</span></p>
+                    <ul>
+                        <li><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>ai（锁球、合球、追踪炮、追踪三角）</li>
+                        <li><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>官方售后</li>
+                        <li><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>官方Bo</li>
+                    </ul>
+                    <a href="https://lik-love.xyz/#/goods?goods_id=1" target="_blank" rel="noopener noreferrer" class="pricing-cta mt-auto">升级到plus</a>
+                </div>
+                <!-- Pro Plan -->
+                <div class="pricing-card">
+                    <h3 class="text-xl font-bold">Pro</h3>
+                    <p class="price mt-4">¥288 <span class="price-sub">/ 永久</span></p>
+                    <ul>
+                        <li><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>ai（锁球、合球、追踪炮、追踪三角）</li>
+                        <li><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>1对1售后</li>
+                        <li><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>定制服务器Bo</li>
+                    </ul>
+                    <a href="#" id="proUpgradeBtn" class="pricing-cta mt-auto">升级到 Pro</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Pro Contact Modal -->
+    <div id="proContactModal" class="modal-overlay">
+        <div class="modal-content">
+            <button id="closeProModalBtn" class="modal-close-btn">&times;</button>
+            <div class="text-center text-lg">
+                <p>请联系群主或者管理进行升级</p>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        const canvas = document.getElementById('starfield');
+        const ctx = canvas.getContext('2d');
+
+        let particles = [];
+        let nebulas = [];
+        let nebulaColors = [
+            // A new, more vibrant and ethereal palette
+            {r: 20, g: 150, b: 180},   // Celestial Teal
+            {r: 255, g: 180, b: 80},  // Starlight Gold
+            {r: 220, g: 50, b: 130},  // Cosmic Pink
+            {r: 120, g: 70, b: 190}   // Nebula Purple
+        ];
+        
+        const config = {
+            numParticles: 3000,
+            numNebulas: 15
+        };
+
+        let mouse = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+        let center = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+        let isShiftDown = false;
+        let isMouseDown = false;
+        
+        // --- Perlin Noise Generation ---
+        // This creates the realistic, gas-like texture for nebulas
+        const noiseCanvas = document.createElement('canvas');
+        const noiseCtx = noiseCanvas.getContext('2d');
+        const noiseSize = 256;
+        noiseCanvas.width = noiseSize;
+        noiseCanvas.height = noiseSize;
+
+        function generateNoise() {
+            const imageData = noiseCtx.createImageData(noiseSize, noiseSize);
+            const p = new Array(512);
+            const permutation = [151,160,137,91,90,15,131,13,201,95,96,53,194,233,7,225,140,36,103,30,69,142,8,99,37,240,21,10,23,190, 6,148,247,120,234,75,0,26,197,62,94,252,219,203,117,35,11,32,57,177,33,88,237,149,56,87,174,20,125,136,171,168, 68,175,74,165,71,134,139,48,27,166,77,146,158,231,83,111,229,122,60,211,133,230,220,105,92,41,55,46,245,40,244,102,143,54, 65,25,63,161, 1,216,80,73,209,76,132,187,208, 89,18,169,200,196,135,130,116,188,159,86,164,100,109,198,173,186, 3,64,52,217,226,250,124,123,5,202,38,147,118,126,255,82,85,212,207,206,59,227,47,16,58,17,182,189,28,42,23,183,170,213,119,248,152, 2,44,154,163, 70,221,153,101,155,167, 43,172,9,129,22,39,253, 19,98,108,110,79,113,224,232,178,185, 112,104,218,246,97,228,251,34,242,193,238,210,144,12,191,179,162,241, 81,51,145,235,249,14,239,107,49,192,214, 31,181,199,106,157,184, 84,204,176,115,121,50,45,127, 4,150,254,138,236,205,93,222,114,67,29,24,72,243,141,128,195,78,66,215,61,156,180];
+            for (let i=0; i < 256 ; i++) p[256+i] = p[i] = permutation[i];
+
+            const fade = (t) => t * t * t * (t * (t * 6 - 15) + 10);
+            const lerp = (t, a, b) => a + t * (a - b);
+            const grad = (hash, x, y) => {
+                const h = hash & 15;
+                const u = h<8 ? x : y;
+                const v = h<4 ? y : h===12||h===14 ? x : 0;
+                return ((h&1) === 0 ? u : -u) + ((h&2) === 0 ? v : -v);
+            }
+            
+            for (let y = 0; y < noiseSize; y++) {
+                for (let x = 0; x < noiseSize; x++) {
+                    let value = 0;
+                    let freq = 0.03;
+                    let amp = 1;
+                    for (let i = 0; i < 6; i++) {
+                         let X = Math.floor(x * freq) & 255;
+                         let Y = Math.floor(y * freq) & 255;
+                         let xf = x * freq - Math.floor(x * freq);
+                         let yf = y * freq - Math.floor(y * freq);
+                         let u = fade(xf);
+                         let v = fade(yf);
+                         let n00 = grad(p[p[X]+Y], xf, yf);
+                         let n01 = grad(p[p[X]+Y+1], xf, yf-1);
+                         let n10 = grad(p[p[X+1]+Y], xf-1, yf);
+                         let n11 = grad(p[p[X+1]+Y+1], xf-1, yf-1);
+                         value += (lerp(v, lerp(u, n00, n10), lerp(u, n01, n11)) + 1) * 0.5 * amp;
+                         freq *= 2;
+                         amp *= 0.5;
+                    }
+                    const i = (x + y * noiseSize) * 4;
+                    const colorVal = Math.pow(value, 2.5) * 255;
+                    imageData.data[i] = colorVal;
+                    imageData.data[i+1] = colorVal;
+                    imageData.data[i+2] = colorVal;
+                    imageData.data[i+3] = 255;
+                }
+            }
+            noiseCtx.putImageData(imageData, 0, 0);
+        }
+        generateNoise();
+
+
+        function setCanvasSize() {
+            const dpr = Math.max(window.devicePixelRatio || 1, 1);
+            canvas.width = Math.floor(window.innerWidth * dpr);
+            canvas.height = Math.floor(window.innerHeight * dpr);
+            canvas.style.width = window.innerWidth + "px";
+            canvas.style.height = window.innerHeight + "px";
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            center.x = window.innerWidth / 2;
+            center.y = window.innerHeight / 2;
+        }
+
+        class Particle {
+            constructor() {
+                this.reset();
+            }
+
+            reset() {
+                const angle = Math.random() * Math.PI * 4;
+                const dist = Math.pow(Math.random(), 1.5) * Math.max(canvas.width, canvas.height) * 0.6;
+                
+                this.x = center.x + Math.cos(angle) * dist;
+                this.y = center.y + Math.sin(angle) * dist;
+                this.z = Math.random() * 0.9 + 0.1;
+                this.radius = (Math.random() * 1.2 + 0.5) * this.z;
+                this.alpha = Math.pow(Math.random() * 0.8 + 0.1, 2) * this.z;
+                this.initial = { x: this.x, y: this.y, alpha: this.alpha };
+                this.vx = 0;
+                this.vy = 0;
+            }
+
+            draw() {
+                // Realistic star glow rendering
+                const glowRadius = this.radius * 5;
+                const gradient = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, glowRadius);
+                gradient.addColorStop(0, `rgba(255, 255, 255, ${this.alpha * 0.8})`);
+                gradient.addColorStop(0.2, `rgba(255, 255, 255, ${this.alpha * 0.5})`);
+                gradient.addColorStop(0.5, `rgba(200, 200, 255, ${this.alpha * 0.2})`);
+                gradient.addColorStop(1, 'rgba(200, 200, 255, 0)');
+
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, glowRadius, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Bright core
+                ctx.fillStyle = `rgba(255, 255, 255, ${this.alpha})`;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius * 0.5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            update() {
+                if (isMouseDown) {
+                    let dx_warp = center.x - this.x;
+                    let dy_warp = center.y - this.y;
+                    this.vx += dx_warp * 0.001 * this.z;
+                    this.vy += dy_warp * 0.001 * this.z;
+                    let distance_from_center = Math.sqrt(dx_warp*dx_warp + dy_warp*dy_warp);
+                    if (distance_from_center < 10) this.reset();
+                } else {
+                    // Add a variable orbital motion to make stars move without mouse input
+                    const dx_center = this.x - center.x;
+                    const dy_center = this.y - center.y;
+                    
+                    // Create a speed that oscillates over time for a more dynamic "breathing" effect
+                    const time_factor = Date.now() * 0.0002;
+                    // Combine two sine waves for a less regular, more organic rhythm
+                    const speed_variation = (Math.sin(time_factor) + Math.sin(time_factor * 0.5)) * 0.5; 
+                    const base_speed = 0.0004 * this.z;
+                    const variable_speed = 0.0006 * this.z;
+                    const rotational_force = base_speed + variable_speed * speed_variation;
+
+                    this.vx -= dy_center * rotational_force;
+                    this.vy += dx_center * rotational_force;
+
+                    const parallaxX = (mouse.x - center.x) * 0.00002 * this.z;
+                    const parallaxY = (mouse.y - center.y) * 0.00002 * this.z;
+                    let dx_mouse = mouse.x - this.x;
+                    let dy_mouse = mouse.y - this.y;
+                    let distance_mouse = Math.sqrt(dx_mouse * dx_mouse + dy_mouse * dy_mouse);
+                    if (distance_mouse < 120) {
+                        const forceDirection = isShiftDown ? 1 : -1;
+                        const force = (1 - (distance_mouse / 120)) * this.z * 0.8 * forceDirection;
+                        this.vx += dx_mouse * force * 0.01;
+                        this.vy += dy_mouse * force * 0.01;
+                    }
+                    this.vx += (this.initial.x + parallaxX - this.x) * 0.0005;
+                    this.vy += (this.initial.y + parallaxY - this.y) * 0.0005;
+                }
+                this.vx *= 0.96;
+                this.vy *= 0.96;
+                this.x += this.vx;
+                this.y += this.vy;
+            }
+        }
+
+        class Nebula {
+             constructor(color, isDustCloud = false) {
+                this.x = Math.random() * canvas.width * 1.5 - canvas.width * 0.25;
+                this.y = Math.random() * canvas.height * 1.5 - canvas.height * 0.25;
+                this.color = color;
+                this.radius = Math.random() * 400 + 300;
+                this.alpha = Math.random() * 0.2 + (isDustCloud ? 0.4 : 0.1);
+                this.speedX = (Math.random() - 0.5) * 0.1;
+                this.speedY = (Math.random() - 0.5) * 0.1;
+                this.rotation = Math.random() * Math.PI * 2;
+                this.isDustCloud = isDustCloud;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = this.alpha;
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.rotation);
+                
+                if (this.isDustCloud) {
+                    ctx.globalCompositeOperation = 'multiply';
+                } else {
+                    ctx.globalCompositeOperation = 'lighter';
+                }
+                
+                // Use the noise texture as a mask
+                ctx.drawImage(noiseCanvas, -this.radius, -this.radius, this.radius * 2, this.radius * 2);
+                
+                // Colorize the texture
+                ctx.fillStyle = `rgb(${this.color.r}, ${this.color.g}, ${this.color.b})`;
+                ctx.globalCompositeOperation = this.isDustCloud ? 'source-in' : 'source-atop';
+                ctx.fillRect(-this.radius, -this.radius, this.radius * 2, this.radius * 2);
+                
+                ctx.restore();
+            }
+            
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                if (this.x + this.radius < 0) this.x = canvas.width + this.radius;
+                if (this.x - this.radius > canvas.width) this.x = -this.radius;
+                if (this.y + this.radius < 0) this.y = canvas.height + this.radius;
+                if (this.y - this.radius > canvas.height) this.y = -this.radius;
+            }
+        }
+        
+        function init() {
+            setCanvasSize();
+            particles = [];
+            nebulas = [];
+
+            for (let i = 0; i < config.numParticles; i++) {
+                particles.push(new Particle());
+            }
+
+            for (let i = 0; i < config.numNebulas; i++) {
+                const color = nebulaColors[i % nebulaColors.length];
+                nebulas.push(new Nebula(color));
+            }
+            // Add dark dust clouds
+            for (let i = 0; i < 5; i++) {
+                nebulas.push(new Nebula({r:0,g:0,b:0}, true));
+            }
+            
+            setTimeout(() => {
+                document.getElementById('instructions').classList.add('fade-out');
+            }, 4000);
+        }
+
+        function animate() {
+            ctx.fillStyle = '#000008';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            nebulas.forEach(n => n.update());
+            nebulas.forEach(n => n.draw());
+            
+            // Reset composite operation for stars
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.globalAlpha = 1;
+
+            const dynamicRotation = (mouse.x - center.x) * 0.00001;
+            ctx.save();
+            ctx.translate(center.x, center.y);
+            ctx.rotate(dynamicRotation);
+            ctx.translate(-center.x, -center.y);
+            particles.forEach(p => p.draw());
+            ctx.restore();
+            
+            particles.forEach(p => p.update());
+
+            const cursorGradient = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, 30);
+            cursorGradient.addColorStop(0, `rgba(255, 255, 255, ${isMouseDown ? 0.3 : 0.15})`);
+            cursorGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            ctx.fillStyle = cursorGradient;
+            ctx.beginPath();
+            ctx.arc(mouse.x, mouse.y, 30, 0, Math.PI * 2);
+            ctx.fill();
+
+            requestAnimationFrame(animate);
+        }
+
+        window.addEventListener('resize', () => setTimeout(init, 100));
+        window.addEventListener('mousemove', (event) => { mouse.x = event.x; mouse.y = event.y; });
+        window.addEventListener('keydown', (e) => { if (e.key === 'Shift') isShiftDown = true; });
+        window.addEventListener('keyup', (e) => { if (e.key === 'Shift') isShiftDown = false; });
+        window.addEventListener('mousedown', () => { isMouseDown = true; });
+        window.addEventListener('mouseup', () => { isMouseDown = false; });
+        
+        init();
+        animate();
+
+        // --- Modal Logic ---
+        document.addEventListener('DOMContentLoaded', () => {
+            const qqGroupBtn = document.getElementById('qqGroupBtn');
+            const qqModal = document.getElementById('qqModal');
+            const closeQQModalBtn = document.getElementById('closeQQModalBtn');
+            
+            const downloadBtn = document.getElementById('downloadBtn');
+            const downloadModal = document.getElementById('downloadModal');
+            const progressBar = document.getElementById('progressBar');
+
+            const pricingBtn = document.getElementById('pricingBtn');
+            const pricingModal = document.getElementById('pricingModal');
+            const closePricingModalBtn = document.getElementById('closePricingModalBtn');
+            const pricingCards = document.querySelectorAll('.pricing-card');
+
+            const proUpgradeBtn = document.getElementById('proUpgradeBtn');
+            const proContactModal = document.getElementById('proContactModal');
+            const closeProModalBtn = document.getElementById('closeProModalBtn');
+
+            // --- QQ Modal ---
+            const openQQModal = () => qqModal.classList.add('visible');
+            const closeQQModal = () => qqModal.classList.remove('visible');
+
+            if (qqGroupBtn) {
+                qqGroupBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    openQQModal();
+                });
+            }
+            if (closeQQModalBtn) closeQQModalBtn.addEventListener('click', closeQQModal);
+            if (qqModal) qqModal.addEventListener('click', (e) => {
+                if (e.target === qqModal) closeQQModal();
+            });
+
+            // --- Download Modal ---
+            if (downloadBtn) {
+                downloadBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    downloadModal.classList.add('visible');
+                    progressBar.style.transition = 'none';
+                    progressBar.style.width = '0%';
+                    setTimeout(() => {
+                        progressBar.style.transition = 'width 5s cubic-bezier(0.25, 1, 0.5, 1)';
+                        progressBar.style.width = '100%';
+                    }, 50);
+                    setTimeout(() => {
+                        const link = document.createElement('a');
+                        link.href = e.target.href;
+                        link.download = e.target.getAttribute('download');
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                    }, 500);
+                    setTimeout(() => {
+                        downloadModal.classList.remove('visible');
+                    }, 5500);
+                });
+            }
+
+            // --- Pricing Modal ---
+            const openPricingModal = () => pricingModal.classList.add('visible');
+            const closePricingModal = () => pricingModal.classList.remove('visible');
+
+            if(pricingBtn) {
+                pricingBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    openPricingModal();
+                });
+            }
+            if(closePricingModalBtn) closePricingModalBtn.addEventListener('click', closePricingModal);
+            if(pricingModal) {
+                pricingModal.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('modal-overlay')) closePricingModal();
+                });
+            }
+            
+            pricingCards.forEach(card => {
+                card.addEventListener('click', () => {
+                    pricingCards.forEach(c => c.classList.remove('highlight'));
+                    card.classList.add('highlight');
+                });
+            });
+
+            // --- Pro Contact Modal ---
+            const openProModal = () => proContactModal.classList.add('visible');
+            const closeProModal = () => proContactModal.classList.remove('visible');
+
+            if (proUpgradeBtn) {
+                proUpgradeBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    openProModal();
+                });
+            }
+            if (closeProModalBtn) closeProModalBtn.addEventListener('click', closeProModal);
+            if (proContactModal) proContactModal.addEventListener('click', (e) => {
+                if (e.target === proContactModal) closeProModal();
+            });
+        });
+
+    </script>
+</body>
+</html>
